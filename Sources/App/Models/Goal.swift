@@ -48,7 +48,7 @@ extension Goal{
     }
 }
 
-enum GoalType:Int,Codable {
+enum GoalType:Int,PostgreSQLRawEnum,Codable {
     case page,book
 }
 
