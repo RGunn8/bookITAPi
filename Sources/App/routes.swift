@@ -5,12 +5,12 @@ import Vapor
 public func routes(_ router: Router) throws {
     // public routes
     let userController = UserController()
-    router.post("users", use: userController.create)
+    router.post("/api/v1/users", use: userController.create)
 
     
     // basic / password auth protected routes
 
-    router.post("login", use: userController.login)
+    router.post("api/v1/login", use: userController.login)
     
     // bearer / token auth protected routes
     let bearer = router.grouped(User.tokenAuthMiddleware())
