@@ -4,13 +4,15 @@ import FluentSQLite
 /// Simple todo-list controller.
 final class TodoController {
     /// Returns a list of all todos for the auth'd user.
-    func index(_ req: Request) throws -> Future<[Todo]> {
+    func index(_ req: Request) throws -> Future<TodoResponse> {
         // fetch auth'd user
         let user = try req.requireAuthenticated(User.self)
-        
+
         // query all todo's belonging to user
         return try Todo.query(on: req)
-            .filter(\.userID == user.requireID()).all()
+            .filter(\.userID == user.requireID()).all().map(to:TodoResponse.self){todos in
+                return  TodoResponse(success: true, error: nil, todos: todos)
+        }
     }
 
     /// Creates a new todo for the auth'd user.
@@ -50,4 +52,17 @@ final class TodoController {
 struct CreateTodoRequest: Content {
     /// Todo title.
     var title: String
+}
+
+struct TodoResponse:Content,ResponseProtocol{
+    var success: Bool
+    var error:String?
+    let todos:[Todo]?
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(success, forKey: .success)
+        try container.encode(error, forKey: .error)
+        try container.encode(todos, forKey: .todos)
+    }
 }

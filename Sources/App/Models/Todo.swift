@@ -1,8 +1,8 @@
-import FluentSQLite
+import FluentPostgreSQL
 import Vapor
 
 /// A single entry of a todo list.
-final class Todo: SQLiteModel {
+final class Todo: PostgreSQLModel {
     /// The unique identifier for this `Todo`.
     var id: Int?
 
@@ -29,8 +29,8 @@ extension Todo {
 
 /// Allows `Todo` to be used as a Fluent migration.
 extension Todo: Migration {
-    static func prepare(on conn: SQLiteConnection) -> Future<Void> {
-        return SQLiteDatabase.create(Todo.self, on: conn) { builder in
+    static func prepare(on conn: PostgreSQLConnection) -> Future<Void> {
+        return PostgreSQLDatabase.create(Todo.self, on: conn) { builder in
             builder.field(for: \.id, isIdentifier: true)
             builder.field(for: \.title)
             builder.field(for: \.userID)

@@ -1,10 +1,10 @@
 import Authentication
 import Crypto
-import FluentSQLite
+import FluentPostgreSQL
 import Vapor
 
 /// An ephermal authentication token that identifies a registered user.
-final class UserToken: SQLiteModel {
+final class UserToken: PostgreSQLModel {
     /// Creates a new `UserToken` for a given user.
     static func create(userID: User.ID) throws -> UserToken {
         // generate a random 128-bit, base64-encoded string.
@@ -12,17 +12,13 @@ final class UserToken: SQLiteModel {
         // init a new `UserToken` from that string.
         return .init(string: string, userID: userID)
     }
-    
-    /// See `Model`.
+
     static var deletedAtKey: TimestampKey? { return \.expiresAt }
-    
-    /// UserToken's unique identifier.
+
     var id: Int?
-    
-    /// Unique token string.
-    var string: String
-    
-    /// Reference to user that owns this token.
+
+    var tokenString: String
+
     var userID: User.ID
     
     /// Expiration date. Token will no longer be valid after this point.
@@ -31,7 +27,7 @@ final class UserToken: SQLiteModel {
     /// Creates a new `UserToken`.
     init(id: Int? = nil, string: String, userID: User.ID) {
         self.id = id
-        self.string = string
+        self.tokenString = string
         // set token to expire after 5 hours
         self.expiresAt = Date.init(timeInterval: 60 * 60 * 5, since: .init())
         self.userID = userID
@@ -52,7 +48,7 @@ extension UserToken: Token {
     
     /// See `Token`.
     static var tokenKey: WritableKeyPath<UserToken, String> {
-        return \.string
+        return \.tokenString
     }
     
     /// See `Token`.
@@ -64,10 +60,10 @@ extension UserToken: Token {
 /// Allows `UserToken` to be used as a Fluent migration.
 extension UserToken: Migration {
     /// See `Migration`.
-    static func prepare(on conn: SQLiteConnection) -> Future<Void> {
-        return SQLiteDatabase.create(UserToken.self, on: conn) { builder in
+    static func prepare(on conn: PostgreSQLConnection) -> Future<Void> {
+        return PostgreSQLDatabase.create(UserToken.self, on: conn) { builder in
             builder.field(for: \.id, isIdentifier: true)
-            builder.field(for: \.string)
+            builder.field(for: \.tokenString)
             builder.field(for: \.userID)
             builder.field(for: \.expiresAt)
             builder.reference(from: \.userID, to: \User.id)
@@ -80,3 +76,4 @@ extension UserToken: Content { }
 
 /// Allows `UserToken` to be used as a dynamic parameter in route definitions.
 extension UserToken: Parameter { }
+

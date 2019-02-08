@@ -5,64 +5,47 @@ import FluentSQLite
 /// Creates new users and logs them in.
 final class UserController {
     /// Logs a user in, returning a token for accessing protected endpoints.
-    func login(_ req: Request) throws -> Future<UserToken> {
+    func login(_ req: Request) throws -> Future<CreateUserResponse> {
         // get user auth'd by basic auth middleware
-        let user = try req.requireAuthenticated(User.self)
-        
-        // create new token for this user
-        let token = try UserToken.create(userID: user.requireID())
-        
-        // save and return token
-        return token.save(on: req)
+        var loginUserPasword = ""
+        return try req.content.decode(LoginUser.self).flatMap(to: User?.self) {user  in
+            loginUserPasword = user.password
+               return  User.query(on: req).filter(\.email == user.email).first()
+            }.flatMap(to:CreateUserResponse.self){ queryUser in
+                if let queryUser = queryUser{
+                    if try BCrypt.verify(loginUserPasword, created: queryUser.passwordHash){
+                        let token = try UserToken.create(userID: queryUser.requireID())
+                        return  token.save(on: req).map(to: CreateUserResponse.self) { token  in
+                            return try CreateUserResponse(success: true, error: nil, createUser:  CreateUser(id: queryUser.requireID(), name: queryUser.name, email: queryUser.email, favBook:queryUser.favBook, token: token.tokenString))
+
+                        }
+                    }
+                }
+                 return req.future(CreateUserResponse(success: false, error: "Invaild Password or email try again", createUser: nil))
+        }
+
     }
     
     /// Creates a new user.
-    func create(_ req: Request) throws -> Future<UserResponse> {
+    func create(_ req: Request) throws -> Future<CreateUserResponse> {
         // decode request content
-        return try req.content.decode(CreateUserRequest.self).flatMap { user -> Future<User> in
+        return try req.content.decode(CreateUserRequest.self).flatMap { user -> Future<CreateUserResponse> in
             // verify that passwords match
             guard user.password == user.verifyPassword else {
-                throw Abort(.badRequest, reason: "Password and verification must match.")
+                   return req.future(CreateUserResponse(success: false, error: "Password and verification must match.", createUser: nil))
             }
-            
-            // hash user's password using BCrypt
+
             let hash = try BCrypt.hash(user.password)
-            // save new user
-            return User(id: nil, name: user.name, email: user.email, passwordHash: hash)
-                .save(on: req)
-        }.map { user in
-            // map to public user response (omits password hash)
-            return try UserResponse(id: user.requireID(), name: user.name, email: user.email)
+            return User(id: nil, name: user.name, email: user.email, passwordHash: hash).save(on: req)
+                .flatMap(to:CreateUserResponse.self){ user in
+                    let token = try UserToken.create(userID: user.requireID())
+                    return  token.save(on: req).map(to: CreateUserResponse.self) { token  in
+                        return try CreateUserResponse(success: true, error: nil, createUser:  CreateUser(id: user.requireID(), name: user.name, email: user.email, favBook:user.favBook, token: token.tokenString))
+
+                    }
+            }
         }
     }
 }
 
-// MARK: Content
 
-/// Data required to create a user.
-struct CreateUserRequest: Content {
-    /// User's full name.
-    var name: String
-    
-    /// User's email address.
-    var email: String
-    
-    /// User's desired password.
-    var password: String
-    
-    /// User's password repeated to ensure they typed it correctly.
-    var verifyPassword: String
-}
-
-/// Public representation of user data.
-struct UserResponse: Content {
-    /// User's unique identifier.
-    /// Not optional since we only return users that exist in the DB.
-    var id: Int
-    
-    /// User's full name.
-    var name: String
-    
-    /// User's email address.
-    var email: String
-}
