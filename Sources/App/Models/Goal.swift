@@ -38,7 +38,7 @@ extension Goal:Migration{
             builder.field(for: \.endDate)
             builder.field(for: \.goalCount)
             builder.field(for: \.goalType)
-            builder.unique(on: \.userID)
+            builder.field(for: \.userID)
         }
     }
 }
